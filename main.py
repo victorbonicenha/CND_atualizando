@@ -188,7 +188,6 @@ def cnd_divida_ativa():
         erro.telegram_bot(f"Erro ao clicar no menu: {str(e)}", ITOKEN, CHAT_ID)
         navegador.quit()
         return
-
     try:
         wait = WebDriverWait(navegador, 10)
         campo_cnpj = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="emitirCrda:crdaInputCnpjBase"]')))
@@ -197,7 +196,6 @@ def cnd_divida_ativa():
         erro.telegram_bot("Campo CNPJ não encontrado na dívida ativa.", ITOKEN, CHAT_ID)
         navegador.quit()
         return
-
     try:
         site_key = navegador.find_element(By.XPATH, '//*[@id="recaptcha"]').get_attribute('data-sitekey')
     except:
