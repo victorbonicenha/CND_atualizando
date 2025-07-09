@@ -488,14 +488,12 @@ if __name__ == "__main__":
         cnd_divida_ativa()
     except Exception as erro_Divida_Ativa:
         print(erro_Divida_Ativa)
-
     sleep(3)
     try:
         cnd_fgts()
     except Exception as erro_FGTS:
         print(erro_FGTS)
     sleep(3)
-
     try:
         cnd_trabalhista(os.path.join(os.getcwd(), 'CND - Trabalhista'))
     except Exception as erro_trabalhista:
