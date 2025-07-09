@@ -34,7 +34,6 @@ meses = {'01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
          '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
          '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'}
 
-
 base_path = r"C:\Users\vbonicenha\Desktop\ApiLira"
 pasta_downloads = os.path.join(os.path.expanduser("~"), "Downloads")
 ano_atual = datetime.now().strftime('%Y')
@@ -57,7 +56,6 @@ def iniciar_selenium(download_path=None):
             "download.prompt_for_download": False,
             "download.directory_upgrade": True}
         options.add_experimental_option("prefs", prefs)
-
     navegador = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return navegador
 
@@ -150,24 +148,18 @@ def resolver_captcha_anticaptcha(navegador, tentativas=3):
         if response.get('errorId') != 0:
             continue
 
-    os.remove(captcha_path)
-    erro.telegram_bot("Timeout: captcha não foi resolvido na certidão municipal.", ITOKEN, CHAT_ID)
-    navegador.quit()
-    exit()
+        task_id = response.get('taskId')
+        for tentativa in range(30):
+            sleep(3)
+            res = requests.post(url_result, json={
+                "clientKey": API_KEY,
+                "taskId": task_id}, headers=headers).json()
 
-    task_id = response.get('taskId')
+            if res.get('status') == 'ready':
+                solution = res.get('solution', {}).get('text')
+                os.remove(captcha_path)
+                return solution
 
-    for tentativa in range(30):
-        sleep(3)
-        res = requests.post(url_result, json={
-            "clientKey": API_KEY,
-            "taskId": task_id}, headers=headers).json()
-
-        if res.get('status') == 'ready':
-            solution = res.get('solution', {}).get('text')
-            os.remove(captcha_path)
-            return solution
-        
     os.remove(captcha_path)
     erro.telegram_bot("Timeout: captcha não foi resolvido na certidão municipal.", ITOKEN, CHAT_ID)
     navegador.quit()
@@ -509,7 +501,6 @@ if __name__ == "__main__":
     except Exception as erro_trabalhista:
         erro.telegram_bot(f'o erro é: {erro_trabalhista}', ITOKEN, CHAT_ID)
     sleep(3)
-
     try:
         cnd_municipal()
     except Exception as erro_municipal:
