@@ -191,27 +191,29 @@ def cnd_divida_ativa():
     except Exception as e:
         erro.telegram_bot(f"Erro ao clicar no menu: {str(e)}", ITOKEN, CHAT_ID)
         navegador.quit()
-        return
+        raise
+
     try:
         wait = WebDriverWait(navegador, 10)
         campo_cnpj = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="emitirCrda:crdaInputCnpjBase"]')))
         campo_cnpj.send_keys(CNPJ_BASE)
-    except:
+    except Exception as e:
         erro.telegram_bot("Campo CNPJ não encontrado na dívida ativa.", ITOKEN, CHAT_ID)
         navegador.quit()
-        return
+        raise
+
     try:
         site_key = navegador.find_element(By.XPATH, '//*[@id="recaptcha"]').get_attribute('data-sitekey')
-    except:
+    except Exception as e:
         erro.telegram_bot("Não foi possível capturar o sitekey do reCAPTCHA.", ITOKEN, CHAT_ID)
         navegador.quit()
-        return
+        raise
 
     token = resolver_captcha_recaptcha(API_KEY, site_key, url_site)
 
     if not token:
         navegador.quit()
-        return
+        raise Exception("Não foi possível resolver o reCAPTCHA.")
 
     try:
         navegador.execute_script("""
@@ -229,7 +231,7 @@ def cnd_divida_ativa():
         arquivos_encontrados = False
 
         for arquivo in os.listdir(pasta_downloads):
-            if arquivo.endswith(".pdf") and "crda" in arquivo.lower():                                                                                                           
+            if arquivo.endswith(".pdf") and "crda" in arquivo.lower():
                 caminho_origem = os.path.join(pasta_downloads, arquivo)
                 nome_novo = f"{os.path.splitext(arquivo)[0]}_validade_{data_hoje}.pdf"
                 caminho_final = os.path.join(pasta_divida_ativa, nome_novo)
@@ -237,17 +239,19 @@ def cnd_divida_ativa():
                     shutil.move(caminho_origem, caminho_final)
                     mensagem = f"Divida Ativa gerada com sucesso!\n\nArquivo salvo em:\n\n{caminho_final}"
                     telegram.telegram_bot_image(mensagem, ITOKEN, CHAT_ID, screenshot_path)
-
                     arquivos_encontrados = True
                     break
                 except Exception as move_error:
                     erro.telegram_bot(f"Erro ao mover arquivo PDF: {str(move_error)}", ITOKEN, CHAT_ID)
+                    raise
 
         if not arquivos_encontrados:
             erro.telegram_bot("Nenhum arquivo PDF com 'crda' encontrado na pasta de downloads.", ITOKEN, CHAT_ID)
+            raise Exception("PDF da dívida ativa não foi encontrado.")  # <-- AQUI
 
     except Exception as e:
         erro.telegram_bot(f"Erro ao gerar certidão: {str(e)}", ITOKEN, CHAT_ID)
+        raise
 
     navegador.quit()
 
@@ -255,7 +259,6 @@ def cnd_fgts():
     navegador = iniciar_selenium()
     url_site = 'https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf'
     navegador.get(url_site)
-
     sleep(3)
 
     navegador.find_element(By.XPATH, '//*[@id="mainForm:txtInscricao1"]').send_keys(CNPJ_BASICO)
@@ -263,7 +266,6 @@ def cnd_fgts():
 
     navegador.find_element(By.XPATH, '//*[@id="mainForm:uf"]').click()
     navegador.find_element(By.XPATH, '//*[@id="mainForm:uf"]/option[26]').click()
-
     sleep(3)
 
     tentativas = 0
@@ -280,17 +282,14 @@ def cnd_fgts():
 
         captcha_src = captcha_element.get_attribute("src")
         if captcha_src.strip() == "data:image/png;base64,":
-
             erro_captcha_path = os.path.abspath(f"captcha_quebrado_{datetime.now().strftime('%H%M%S')}.png")
             captcha_element.screenshot(erro_captcha_path)
-
-            erro.telegram_bot_image("CAPTCHA não carregou corretamente (base64 vazio).\n\nO site pode estar fora do ar ou com erro de carregamento.", ITOKEN, CHAT_ID, erro_captcha_path)
+            erro.telegram_bot_image("CAPTCHA não carregou corretamente (base64 vazio).", ITOKEN, CHAT_ID, erro_captcha_path)
             navegador.quit()
-            return
+            raise Exception("CAPTCHA base64 vazio, site possivelmente fora do ar.")
 
         image_path = 'captcha_fgts.png'
         captcha_element.screenshot(image_path)
-
         captcha_resolvido = resolver_captcha_imagem(image_path)
 
         if captcha_resolvido and len(captcha_resolvido) >= 4:
@@ -329,13 +328,13 @@ def cnd_fgts():
                 validade_emisao.replace('\n', ' '))
 
             if reg_val:
-                validade = reg_val.group(1).replace("/", "-")
+                validade = reg_val.group(1)
                 emissao = reg_val.group(2)
             else:
-                validade = datetime.datetime.now().strftime("%Y-%m-%d")
+                validade = "NÃO ENCONTRADA"
                 emissao = "sem_numero"
 
-            nome_arquivo = f"print_validade_{validade}_cert_{emissao}.png"
+            nome_arquivo = f"fgts_{datetime.now().strftime('%d-%m-%Y')}.png"
             navegador.fullscreen_window()
             sleep(2)
             navegador.get_screenshot_as_file(nome_arquivo)
@@ -344,17 +343,24 @@ def cnd_fgts():
             novo_caminho = os.path.join(pasta_fgts, nome_arquivo)
             shutil.move(screenshot_path, novo_caminho)
 
-            telegram.telegram_bot_image(f"FGTS gerada com sucesso!\n\nValidade: {validade}\n\nNº: {emissao}\n\nArquivo salvo em:\n\n{novo_caminho}", ITOKEN, CHAT_ID, novo_caminho)
+            telegram.telegram_bot_image(
+                f"FGTS gerada com sucesso!\n\nValidade: {validade}\n\nNº: {emissao}\n\nArquivo salvo em:\n\n{novo_caminho}",
+                ITOKEN, CHAT_ID, novo_caminho)
 
         except Exception as e:
             screenshot_path = os.path.abspath('erro_captura_certidao.png')
             navegador.get_screenshot_as_file(screenshot_path)
             erro.telegram_bot_image("Erro ao gerar certidão.", ITOKEN, CHAT_ID, screenshot_path)
+            navegador.quit()
+            raise
+
     else:
         erro.telegram_bot("Não foi possível passar do captcha após 5 tentativas.", ITOKEN, CHAT_ID)
+        navegador.quit()
+        raise Exception("Captcha não resolvido após 5 tentativas.")
 
     sleep(5)
-    navegador.quit()       
+    navegador.quit()
 
 def cnd_trabalhista(base_path):
     navegador = iniciar_selenium(base_path)
@@ -363,45 +369,56 @@ def cnd_trabalhista(base_path):
     navegador.get(url)
     sleep(3)
 
-    navegador.find_element(By.XPATH, '//*[@id="corpo"]/div/div[2]/input[1]').click()
-    sleep(2)
+    try:
+        navegador.find_element(By.XPATH, '//*[@id="corpo"]/div/div[2]/input[1]').click()
+        sleep(2)
 
-    navegador.find_element(By.XPATH, '//*[@id="gerarCertidaoForm:cpfCnpj"]').send_keys(CNPJ)
-    sleep(2)
+        navegador.find_element(By.XPATH, '//*[@id="gerarCertidaoForm:cpfCnpj"]').send_keys(CNPJ)
+        sleep(2)
 
-    wait = WebDriverWait(navegador, 10)
-    captcha_element = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="idImgBase64"]')))
-    
-    captcha_path = os.path.join(base_path, 'captcha_trabalhista.png')
-    os.makedirs(base_path, exist_ok=True)
-    captcha_element.screenshot(captcha_path)
+        wait = WebDriverWait(navegador, 10)
+        captcha_element = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="idImgBase64"]')))
 
-    captcha_text = resolver_captcha_imagem(captcha_path)
+        captcha_path = os.path.join(base_path, 'captcha_trabalhista.png')
+        os.makedirs(base_path, exist_ok=True)
+        captcha_element.screenshot(captcha_path)
 
-    if not captcha_text or len(captcha_text.strip()) < 4:
-        telegram.telegram_bot("Falha ao resolver o CAPTCHA da Certidão Trabalhista.", ITOKEN, CHAT_ID)
+        captcha_text = resolver_captcha_imagem(captcha_path)
+
+        if not captcha_text or len(captcha_text.strip()) < 4:
+            raise Exception("Falha ao resolver o CAPTCHA da Certidão Trabalhista.")
+
+        navegador.find_element(By.XPATH, '//*[@id="idCampoResposta"]').send_keys(captcha_text)
+        navegador.find_element(By.XPATH, '//*[@id="gerarCertidaoForm:btnEmitirCertidao"]').click()
+        sleep(2)
+
+        screenshot_path = os.path.join(os.getcwd(), f"print_Trabalhista{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png")
+        navegador.save_screenshot(screenshot_path)
+
+    except Exception as e:
         navegador.quit()
-        return
-
-    navegador.find_element(By.XPATH, '//*[@id="idCampoResposta"]').send_keys(captcha_text)
-
-    navegador.find_element(By.XPATH, '//*[@id="gerarCertidaoForm:btnEmitirCertidao"]').click()
-    sleep(2)
-
-    screenshot_path = os.path.join(os.getcwd(), f"print_Trabalhista{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png")
-    navegador.save_screenshot(screenshot_path)
+        raise Exception(f"Erro na emissão da Certidão Trabalhista: {str(e)}")
 
     navegador.quit()
+
+    encontrou = False
 
     for arquivo in os.listdir(base_path):
         if "certidao" in arquivo.lower() and arquivo.lower().endswith(".pdf"):
             origem = os.path.join(base_path, arquivo)
             destino = os.path.join(pasta_trabalhista, arquivo)
-            shutil.move(origem, destino)
+            try:
+                shutil.move(origem, destino)
+                nome_arquivo = os.path.basename(destino)
+                mensagem = f"PDF Trabalhista gerado com sucesso!\n\n{nome_arquivo}\n\nmovido para a pasta:\n\n{pasta_trabalhista}"
+                telegram.telegram_bot_image(mensagem, ITOKEN, CHAT_ID, screenshot_path)
+                encontrou = True
+                break
+            except Exception as move_erro:
+                raise Exception(f"Erro ao mover o PDF da Certidão Trabalhista: {move_erro}")
 
-            nome_arquivo = os.path.basename(destino)
-            mensagem = f"PDF Trabalhista\n\n{nome_arquivo}\n\nmovido para a pasta {pasta_trabalhista}"
-            telegram.telegram_bot_image(mensagem, ITOKEN, CHAT_ID, screenshot_path)
+    if not encontrou:
+        raise Exception("PDF da Certidão Trabalhista não foi encontrado após emissão.")
 
 def cnd_municipal():
     navegador = iniciar_selenium()
@@ -444,52 +461,31 @@ def cnd_municipal():
         navegador.get('https://portaldeservicos.diadema.sp.gov.br/eagata/servlet/hwvdocumentos_v3')
         navegador.fullscreen_window()
         sleep(2)
-
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(1.5)
-    except:
-        pass
+    except Exception as e:
+        navegador.quit()
+        raise Exception("Falha ao carregar página final da certidão.")
+
     try:
         validade_extracao = navegador.find_element(By.XPATH, '//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[6]/td[2]/p[2]')
         validade_regex = validade_extracao.text
-        print(f"[DEBUG] Texto extraído para validade: {validade_regex}")
-        
         validade_valor = re.search(r'Validade:\s*(\d{2}/\d{2}/\d{4})', validade_regex)
-        
+
         if validade_valor:
             validade = validade_valor.group(1)
-            print(f"[DEBUG] Validade encontrada: {validade}")
         else:
-            validade = "NÃO ENCONTRADA"
-            erro.telegram_bot("Não foi possível extrair a validade da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
+            raise Exception("Validade não encontrada no texto.")
 
         emissao_extracao = navegador.find_element(By.XPATH, '//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[1]/td/h2[2]/span')
         emissao_regex = emissao_extracao.text
-        print(f"[DEBUG] Texto extraído para emissão: {emissao_regex}")
-
         emissao_valor = re.search(r'Nº:\s*(\d+/\d+)', emissao_regex)
 
         if emissao_valor:
             emissao = emissao_valor.group(1)
         else:
-            emissao = "NÃO ENCONTRADA"
-            erro.telegram_bot("Não foi possível extrair o número de emissão da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
+            raise Exception("Número de emissão não encontrado.")
 
-        navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        sleep(2)
-
-        screenshot_path = f"cnd_municipal_{datetime.now().strftime('%d-%m-%Y')}.png"
-        navegador.save_screenshot(screenshot_path)
- 
-        os.makedirs(pasta_municipal, exist_ok=True)
-        destino_final = os.path.join(pasta_municipal, screenshot_path)
-        shutil.move(screenshot_path, destino_final)
-
-        mensagem = f"Certidão Municipal gerada com sucesso\n\nValidade: {validade}\n\nEmissão: {emissao}\n\nArquivo salvo em: {destino_final}"
-        telegram.enviar_imagem(destino_final, mensagem, ITOKEN, CHAT_ID)
-
-    except Exception as e:
-        erro.telegram_bot(f"Erro ao extrair a certidão municipal: {e}", ITOKEN, CHAT_ID)
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(2)
 
@@ -500,34 +496,39 @@ def cnd_municipal():
         destino_final = os.path.join(pasta_municipal, screenshot_path)
         shutil.move(screenshot_path, destino_final)
 
-        mensagem = f"Certidão Municipal gerada com sucesso\n\n Validade:{validade}\n\n Arquivo salvo em: {destino_final}"
+        mensagem = f"Certidão Municipal gerada com sucesso!\n\nValidade: {validade}\n\nEmissão: {emissao}\n\nArquivo salvo em: {destino_final}"
         telegram.enviar_imagem(destino_final, mensagem, ITOKEN, CHAT_ID)
-        
+
     except Exception as e:
-        erro.telegram_bot("Erro ao extrair a certidão municipal.", ITOKEN, CHAT_ID)
+        navegador.quit()
+        raise Exception(f"Erro ao processar certidão municipal: {e}")
 
     navegador.quit()
 
+def tentar_ate_dar_certo(funcao, tentativas=3, *args):
+    for tentativa in range(1, tentativas + 1):
+        try:
+            print(f"Tentando {funcao.__name__} - tentativa {tentativa}")
+            funcao(*args)
+            print(f"{funcao.__name__} finalizada com sucesso.")
+            return True
+        except Exception as erro_execucao:
+            msg = f"{funcao.__name__} Tentativa {tentativa} falhou: {erro_execucao}"
+            print(msg)
+            erro.telegram_bot(msg, ITOKEN, CHAT_ID)
+            sleep(3)
+    print(f"{funcao.__name__} falhou após {tentativas} tentativas.")
+    return False
+
 if __name__ == "__main__":
-    try:
-        cnd_divida_ativa()
-    except Exception as erro_Divida_Ativa:
-        print(erro_Divida_Ativa)
-
-    sleep(3)
-    try:
-        cnd_fgts()
-    except Exception as erro_FGTS:
-        print(erro_FGTS)
+    tentar_ate_dar_certo(cnd_divida_ativa, 3)
     sleep(3)
 
-    try:
-        cnd_trabalhista(os.path.join(os.getcwd(), 'CND - Trabalhista'))
-    except Exception as erro_trabalhista:
-        erro.telegram_bot(f'o erro é: {erro_trabalhista}', ITOKEN, CHAT_ID)
+    tentar_ate_dar_certo(cnd_fgts, 3)
     sleep(3)
-    try:
-        cnd_municipal()
-    except Exception as erro_municipal:
-        print(str(erro_municipal))
+
+    tentar_ate_dar_certo(cnd_trabalhista, 3, os.path.join(os.getcwd(), 'CND - Trabalhista'))
+    sleep(3)
+
+    tentar_ate_dar_certo(cnd_municipal, 3)
     sleep(3)
