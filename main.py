@@ -27,7 +27,7 @@ CPF = os.getenv('CPF')
 API_KEY = os.getenv("CHAVE_API")
 ITOKEN = os.getenv("ITOKEN")
 CHAT_ID = int(os.getenv("CHAT_ID"))
-base_path = os.getenv("BASE_PATH")
+BASE_PATH = os.getenv("BASE_PATH")
 data_hoje = datetime.now().strftime('%d-%m-%Y')
 telegram = TelegramSend("CND")
 erro = TelegramSend("CND ERRO:")
@@ -42,10 +42,10 @@ mes_atual = datetime.now().strftime('%m')
 mes_extenso = meses[mes_atual]
 pasta_mes = f"{mes_atual} - {mes_extenso}"
 
-pasta_fgts = os.path.join(base_path, "CND_FGTS", ano_atual, pasta_mes)
-pasta_municipal = os.path.join(base_path, "CND - Municipal", ano_atual, pasta_mes)
-pasta_trabalhista = os.path.join(base_path, "CND - Trabalhista", ano_atual, pasta_mes)
-pasta_divida_ativa = os.path.join(base_path, "CND - Divida Ativa", ano_atual, pasta_mes)
+pasta_fgts = os.path.join(BASE_PATH, "CND_FGTS", ano_atual, pasta_mes)
+pasta_municipal = os.path.join(BASE_PATH, "CND - Municipal", ano_atual, pasta_mes)
+pasta_trabalhista = os.path.join(BASE_PATH, "CND - Trabalhista", ano_atual, pasta_mes)
+pasta_divida_ativa = os.path.join(BASE_PATH, "CND - Divida Ativa", ano_atual, pasta_mes)
 
 ANTICAPTCHA_CREATE_URL = "https://api.anti-captcha.com/createTask"
 ANTICAPTCHA_RESULT_URL = "https://api.anti-captcha.com/getTaskResult"
