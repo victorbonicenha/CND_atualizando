@@ -255,6 +255,7 @@ def cnd_divida_ativa():
 
     navegador.quit()
 
+
 def cnd_fgts():
     navegador = iniciar_selenium()
     url_site = 'https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf'
@@ -508,16 +509,15 @@ def cnd_municipal():
 def tentar_ate_dar_certo(funcao, tentativas=3, *args):
     for tentativa in range(1, tentativas + 1):
         try:
-            print(f"Tentando {funcao.__name__} - tentativa {tentativa}")
+            print(f"{funcao.__name__} Tentativa {tentativa}")
             funcao(*args)
-            print(f"{funcao.__name__} finalizada com sucesso.")
+            print(f"{funcao.__name__} Finalizada com sucesso.")
             return True
         except Exception as erro_execucao:
-            msg = f"{funcao.__name__} Tentativa {tentativa} falhou: {erro_execucao}"
-            print(msg)
-            erro.telegram_bot(msg, ITOKEN, CHAT_ID)
+            print(f"{funcao.__name__} Tentativa {tentativa} falhou: {erro_execucao}")
             sleep(3)
-    print(f"{funcao.__name__} falhou após {tentativas} tentativas.")
+
+    print(f"{funcao.__name__} Falhou após {tentativas} tentativas.")
     return False
 
 if __name__ == "__main__":
