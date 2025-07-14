@@ -27,6 +27,7 @@ CPF = os.getenv('CPF')
 API_KEY = os.getenv("CHAVE_API")
 ITOKEN = os.getenv("ITOKEN")
 CHAT_ID = int(os.getenv("CHAT_ID"))
+base_path = os.getenv("BASE_PATH")
 data_hoje = datetime.now().strftime('%d-%m-%Y')
 telegram = TelegramSend("CND")
 erro = TelegramSend("CND ERRO:")
@@ -35,7 +36,6 @@ meses = {'01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
          '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
          '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'}
 
-base_path = r"C:\Users\vbonicenha\Desktop\ApiLira"
 pasta_downloads = os.path.join(os.path.expanduser("~"), "Downloads")
 ano_atual = datetime.now().strftime('%Y')
 mes_atual = datetime.now().strftime('%m')
@@ -462,7 +462,7 @@ def cnd_municipal():
         else:
             validade = "NÃO ENCONTRADA"
             erro.telegram_bot("Não foi possível extrair a validade da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
-                 
+
         emissao_extracao = navegador.find_element(By.XPATH, '//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[1]/td/h2[2]/span')
         emissao_regex = emissao_extracao.text
         print(f"[DEBUG] Texto extraído para emissão: {emissao_regex}")
@@ -474,7 +474,7 @@ def cnd_municipal():
         else:
             emissao = "NÃO ENCONTRADA"
             erro.telegram_bot("Não foi possível extrair o número de emissão da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
-                 
+
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(2)
 
@@ -492,7 +492,7 @@ def cnd_municipal():
         erro.telegram_bot(f"Erro ao extrair a certidão municipal: {e}", ITOKEN, CHAT_ID)
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(2)
-             
+
         screenshot_path = f"cnd_municipal_{datetime.now().strftime('%d-%m-%Y')}.png"
         navegador.save_screenshot(screenshot_path)
 
