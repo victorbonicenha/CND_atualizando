@@ -16,6 +16,7 @@ from time import sleep
 import os
 from config_telegram import TelegramSend
 import re
+import sys
 
 load_dotenv()
 
@@ -46,6 +47,9 @@ pasta_municipal = os.path.join(base_path, "CND - Municipal", ano_atual, pasta_me
 pasta_trabalhista = os.path.join(base_path, "CND - Trabalhista", ano_atual, pasta_mes)
 pasta_divida_ativa = os.path.join(base_path, "CND - Divida Ativa", ano_atual, pasta_mes)
 
+ANTICAPTCHA_CREATE_URL = "https://api.anti-captcha.com/createTask"
+ANTICAPTCHA_RESULT_URL = "https://api.anti-captcha.com/getTaskResult"
+
 def iniciar_selenium(download_path=None):
     options = Options()
     options.add_argument("--start-maximized")
@@ -63,8 +67,8 @@ def resolver_captcha_imagem(caminho_imagem, tentativas=3):
     with open(caminho_imagem, 'rb') as f:
         image_base64 = base64.b64encode(f.read()).decode('utf-8')
 
-    url_create = "https://api.anti-captcha.com/createTask"
-    url_result = "https://api.anti-captcha.com/getTaskResult"
+    url_create = ANTICAPTCHA_CREATE_URL
+    url_result = ANTICAPTCHA_RESULT_URL
 
     for i in range(tentativas):
         payload = {
@@ -92,8 +96,8 @@ def resolver_captcha_imagem(caminho_imagem, tentativas=3):
     return None
 
 def resolver_captcha_recaptcha(api_key, site_key, site_url, tentativas=3):
-    url_create = "https://api.anti-captcha.com/createTask"
-    url_result = "https://api.anti-captcha.com/getTaskResult"
+    url_create = ANTICAPTCHA_CREATE_URL
+    url_result = ANTICAPTCHA_RESULT_URL
 
     for i in range(tentativas):
         payload = {
@@ -132,8 +136,8 @@ def resolver_captcha_anticaptcha(navegador, tentativas=3):
     with open(captcha_path, "rb") as img_file:
         b64_string = base64.b64encode(img_file.read()).decode()
 
-    url_create = "https://api.anti-captcha.com/createTask"
-    url_result = "https://api.anti-captcha.com/getTaskResult"
+    url_create = ANTICAPTCHA_CREATE_URL
+    url_result = ANTICAPTCHA_RESULT_URL
     headers = {"Content-Type": "application/json"}
 
     for i in range(tentativas):
@@ -163,7 +167,7 @@ def resolver_captcha_anticaptcha(navegador, tentativas=3):
     os.remove(captcha_path)
     erro.telegram_bot("Timeout: captcha não foi resolvido na certidão municipal.", ITOKEN, CHAT_ID)
     navegador.quit()
-    exit()
+    sys.exit()
 
 def cnd_divida_ativa():
     url_site = 'https://www.dividaativa.pge.sp.gov.br/sc/pages/home/home_novo.jsf'
@@ -225,13 +229,13 @@ def cnd_divida_ativa():
         arquivos_encontrados = False
 
         for arquivo in os.listdir(pasta_downloads):
-            if arquivo.endswith(".pdf") and "crda" in arquivo.lower():
+            if arquivo.endswith(".pdf") and "crda" in arquivo.lower():                                                                                                           
                 caminho_origem = os.path.join(pasta_downloads, arquivo)
                 nome_novo = f"{os.path.splitext(arquivo)[0]}_validade_{data_hoje}.pdf"
                 caminho_final = os.path.join(pasta_divida_ativa, nome_novo)
                 try:
                     shutil.move(caminho_origem, caminho_final)
-                    mensagem = f"Divida Ativa gerada com sucesso!\nArquivo salvo em:\n{caminho_final}"
+                    mensagem = f"Divida Ativa gerada com sucesso!\n\nArquivo salvo em:\n\n{caminho_final}"
                     telegram.telegram_bot_image(mensagem, ITOKEN, CHAT_ID, screenshot_path)
 
                     arquivos_encontrados = True
@@ -280,7 +284,7 @@ def cnd_fgts():
             erro_captcha_path = os.path.abspath(f"captcha_quebrado_{datetime.now().strftime('%H%M%S')}.png")
             captcha_element.screenshot(erro_captcha_path)
 
-            erro.telegram_bot_image("CAPTCHA não carregou corretamente (base64 vazio).\nO site pode estar fora do ar ou com erro de carregamento.", ITOKEN, CHAT_ID, erro_captcha_path)
+            erro.telegram_bot_image("CAPTCHA não carregou corretamente (base64 vazio).\n\nO site pode estar fora do ar ou com erro de carregamento.", ITOKEN, CHAT_ID, erro_captcha_path)
             navegador.quit()
             return
 
@@ -340,7 +344,7 @@ def cnd_fgts():
             novo_caminho = os.path.join(pasta_fgts, nome_arquivo)
             shutil.move(screenshot_path, novo_caminho)
 
-            telegram.telegram_bot_image(f"FGTS gerada com sucesso!\nValidade: {validade} | Nº: {emissao}\nArquivo salvo em:\n{novo_caminho}", ITOKEN, CHAT_ID, novo_caminho)
+            telegram.telegram_bot_image(f"FGTS gerada com sucesso!\n\nValidade: {validade}\n\nNº: {emissao}\n\nArquivo salvo em:\n\n{novo_caminho}", ITOKEN, CHAT_ID, novo_caminho)
 
         except Exception as e:
             screenshot_path = os.path.abspath('erro_captura_certidao.png')
@@ -396,7 +400,7 @@ def cnd_trabalhista(base_path):
             shutil.move(origem, destino)
 
             nome_arquivo = os.path.basename(destino)
-            mensagem = f"PDF Trabalhista '{nome_arquivo}' movido para a pasta '{pasta_trabalhista}'"
+            mensagem = f"PDF Trabalhista\n\n{nome_arquivo}\n\nmovido para a pasta {pasta_trabalhista}"
             telegram.telegram_bot_image(mensagem, ITOKEN, CHAT_ID, screenshot_path)
 
 def cnd_municipal():
@@ -443,27 +447,34 @@ def cnd_municipal():
 
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(1.5)
-
-        validade_extracao = navegador.find_element(By.XPATH,'//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[6]/td[2]/p[2]')
+    except:
+        pass
+    try:
+        validade_extracao = navegador.find_element(By.XPATH, '//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[6]/td[2]/p[2]')
         validade_regex = validade_extracao.text
+        print(f"[DEBUG] Texto extraído para validade: {validade_regex}")
+        
         validade_valor = re.search(r'(\d{2}[./-]\d{2}[./-]\d{4})', validade_regex)
-
+        
         if validade_valor:
             validade = validade_valor.group(1)
+            print(f"[DEBUG] Validade encontrada: {validade}")
         else:
             validade = "NÃO ENCONTRADA"
-            erro.telegram_bot("Não foi possível extrair a validade da certidão municipal.", ITOKEN, CHAT_ID)
-
+            erro.telegram_bot("Não foi possível extrair a validade da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
+                 
         emissao_extracao = navegador.find_element(By.XPATH, '//*[@id="TXTDSP"]/table/tbody/tr[3]/td/table/tbody/tr[1]/td/h2[2]/span')
         emissao_regex = emissao_extracao.text
-        emissao_valor = re.search(r'Nº:\s(\d+.\d+)', emissao_regex)
+        print(f"[DEBUG] Texto extraído para emissão: {emissao_regex}")
+
+        emissao_valor = re.search(r'Nº:\s*(\d+/\d+)', emissao_regex)
 
         if emissao_valor:
             emissao = emissao_valor.group(1)
         else:
             emissao = "NÃO ENCONTRADA"
-            erro.telegram_bot("Não foi possível extrair o número de emissão da certidão municipal.", ITOKEN, CHAT_ID)
-        
+            erro.telegram_bot("Não foi possível extrair o número de emissão da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
+                 
         navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         sleep(2)
 
@@ -474,7 +485,23 @@ def cnd_municipal():
         destino_final = os.path.join(pasta_municipal, screenshot_path)
         shutil.move(screenshot_path, destino_final)
 
-        telegram.telegram_bot(f"Municipal gerada com sucesso!\nValidade: {validade}\nArquivo salvo em: {destino_final}",ITOKEN, CHAT_ID)
+        mensagem = f"Certidão Municipal gerada com sucesso\n\nValidade: {validade}\n\nEmissão: {emissao}\n\nArquivo salvo em: {destino_final}"
+        telegram.enviar_imagem(destino_final, mensagem, ITOKEN, CHAT_ID)
+
+    except Exception as e:
+        erro.telegram_bot(f"Erro ao extrair a certidão municipal: {e}", ITOKEN, CHAT_ID)
+        navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        sleep(2)
+             
+        screenshot_path = f"cnd_municipal_{datetime.now().strftime('%d-%m-%Y')}.png"
+        navegador.save_screenshot(screenshot_path)
+
+        os.makedirs(pasta_municipal, exist_ok=True)
+        destino_final = os.path.join(pasta_municipal, screenshot_path)
+        shutil.move(screenshot_path, destino_final)
+
+        mensagem = f"Certidão Municipal gerada com sucesso\n\n Validade:{validade}\n\n Arquivo salvo em: {destino_final}"
+        telegram.enviar_imagem(destino_final, mensagem, ITOKEN, CHAT_ID)
         
     except Exception as e:
         erro.telegram_bot("Erro ao extrair a certidão municipal.", ITOKEN, CHAT_ID)
@@ -486,12 +513,14 @@ if __name__ == "__main__":
         cnd_divida_ativa()
     except Exception as erro_Divida_Ativa:
         print(erro_Divida_Ativa)
+
     sleep(3)
     try:
         cnd_fgts()
     except Exception as erro_FGTS:
         print(erro_FGTS)
     sleep(3)
+
     try:
         cnd_trabalhista(os.path.join(os.getcwd(), 'CND - Trabalhista'))
     except Exception as erro_trabalhista:
