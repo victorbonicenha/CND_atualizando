@@ -454,8 +454,13 @@ def cnd_municipal():
         validade_regex = validade_extracao.text
         print(f"[DEBUG] Texto extraído para validade: {validade_regex}")
         
-        validade_valor = re.search(r'(\d{2}[./-]\d{2}[./-]\d{4})', validade_regex)
-        
+        validade_valor = re.findall(r'(\d{2}[./-]\d{2}[./-]\d{4})', validade_regex)
+        if validade_valor and len(validade_valor) >= 2:
+            validade = validade_valor[1]
+        else:
+            validade = "NÃO ENCONTRADA"
+            erro.telegram_bot("Não foi possível extrair a validade da certidão municipal (regex falhou).", ITOKEN, CHAT_ID)
+
         if validade_valor:
             validade = validade_valor.group(1)
             print(f"[DEBUG] Validade encontrada: {validade}")
@@ -480,7 +485,7 @@ def cnd_municipal():
 
         screenshot_path = f"cnd_municipal_{datetime.now().strftime('%d-%m-%Y')}.png"
         navegador.save_screenshot(screenshot_path)
-
+ 
         os.makedirs(pasta_municipal, exist_ok=True)
         destino_final = os.path.join(pasta_municipal, screenshot_path)
         shutil.move(screenshot_path, destino_final)
