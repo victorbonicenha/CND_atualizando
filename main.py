@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException
-from config_banco import pode_tentar, registrar_log
+from config_banco import pode_tentar, registrar_log, exibir_status_certidao
 from datetime import datetime
 import base64
 from dateutil.relativedelta import relativedelta
@@ -535,6 +535,8 @@ if __name__ == "__main__":
             registrar_log("divida_ativa", 1)
         else:
             registrar_log("divida_ativa", 0)
+
+        exibir_status_certidao("divida_ativa")
         sleep(3)
 
     if pode_tentar("fgts", data_hoje):
@@ -543,6 +545,8 @@ if __name__ == "__main__":
             registrar_log("fgts", 1)
         else:
             registrar_log("fgts", 0)
+
+        exibir_status_certidao("fgts")
         sleep(3)
 
     if pode_tentar("trabalhista", data_hoje):
@@ -551,6 +555,8 @@ if __name__ == "__main__":
             registrar_log("trabalhista", 1)
         else:
             registrar_log("trabalhista", 0)
+
+        exibir_status_certidao("trabalhista")
         sleep(3)
 
     if pode_tentar("municipal", data_hoje):
@@ -559,4 +565,6 @@ if __name__ == "__main__":
             registrar_log("municipal", 1)
         else:
             registrar_log("municipal", 0)
+
+        exibir_status_certidao("municipal")
         sleep(3)
