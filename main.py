@@ -6,10 +6,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException
+from config_banco import pode_tentar, registrar_log
 from datetime import datetime
 import base64
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
+import pyodbc
 import shutil
 import requests
 from time import sleep
@@ -20,6 +22,7 @@ import sys
 
 load_dotenv()
 
+#------------Informações importantes-----------#
 CNPJ_BASE = os.getenv("CNPJ_BASE")
 CNPJ_BASICO = os.getenv('CNPJ_BASICO')
 CNPJ = os.getenv("CNPJ_SC")
@@ -28,20 +31,23 @@ API_KEY = os.getenv("CHAVE_API")
 ITOKEN = os.getenv("ITOKEN")
 CHAT_ID = int(os.getenv("CHAT_ID"))
 BASE_PATH = os.getenv("BASE_PATH")
-data_hoje = datetime.now().strftime('%d-%m-%Y')
+
+#------------Informações Telegram------------#
 telegram = TelegramSend("CND")
 erro = TelegramSend("CND ERRO:")
 
+#------------Variaveis de tempo------------#
 meses = {'01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
          '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
          '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'}
-
+data_hoje = datetime.now().strftime('%Y-%m-%d')
 pasta_downloads = os.path.join(os.path.expanduser("~"), "Downloads")
 ano_atual = datetime.now().strftime('%Y')
 mes_atual = datetime.now().strftime('%m')
 mes_extenso = meses[mes_atual]
 pasta_mes = f"{mes_atual} - {mes_extenso}"
 
+#------------Variaveis de caminho para pastas------------#
 pasta_fgts = os.path.join(BASE_PATH, "CND_FGTS", ano_atual, pasta_mes)
 pasta_municipal = os.path.join(BASE_PATH, "CND - Municipal", ano_atual, pasta_mes)
 pasta_trabalhista = os.path.join(BASE_PATH, "CND - Trabalhista", ano_atual, pasta_mes)
@@ -247,11 +253,12 @@ def cnd_divida_ativa():
 
         if not arquivos_encontrados:
             erro.telegram_bot("Nenhum arquivo PDF com 'crda' encontrado na pasta de downloads.", ITOKEN, CHAT_ID)
-            raise Exception("PDF da dívida ativa não foi encontrado.")  # <-- AQUI
+            raise Exception("PDF da dívida ativa não foi encontrado.")
 
     except Exception as e:
         erro.telegram_bot(f"Erro ao gerar certidão: {str(e)}", ITOKEN, CHAT_ID)
         raise
+
 
     navegador.quit()
 
@@ -512,23 +519,44 @@ def tentar_ate_dar_certo(funcao, tentativas=3, *args):
             print(f"{funcao.__name__} Tentativa {tentativa}")
             funcao(*args)
             print(f"{funcao.__name__} Finalizada com sucesso.")
-            return True
+            return tentativa
         except Exception as erro_execucao:
             print(f"{funcao.__name__} Tentativa {tentativa} falhou: {erro_execucao}")
             sleep(3)
 
     print(f"{funcao.__name__} Falhou após {tentativas} tentativas.")
-    return False
+    return 0 
 
 if __name__ == "__main__":
-    tentar_ate_dar_certo(cnd_divida_ativa, 3)
-    sleep(3)
 
-    tentar_ate_dar_certo(cnd_fgts, 3)
-    sleep(3)
+    if pode_tentar("divida_ativa", data_hoje):
+        sucesso = tentar_ate_dar_certo(cnd_divida_ativa, 3)
+        if sucesso:
+            registrar_log("divida_ativa", 1)
+        else:
+            registrar_log("divida_ativa", 0)
+        sleep(3)
 
-    tentar_ate_dar_certo(cnd_trabalhista, 3, os.path.join(os.getcwd(), 'CND - Trabalhista'))
-    sleep(3)
+    if pode_tentar("fgts", data_hoje):
+        sucesso = tentar_ate_dar_certo(cnd_fgts, 3)
+        if sucesso:
+            registrar_log("fgts", 1)
+        else:
+            registrar_log("fgts", 0)
+        sleep(3)
 
-    tentar_ate_dar_certo(cnd_municipal, 3)
-    sleep(3)
+    if pode_tentar("trabalhista", data_hoje):
+        sucesso = tentar_ate_dar_certo(cnd_trabalhista, 3, os.path.join(os.getcwd(), 'CND - Trabalhista'))
+        if sucesso:
+            registrar_log("trabalhista", 1)
+        else:
+            registrar_log("trabalhista", 0)
+        sleep(3)
+
+    if pode_tentar("municipal", data_hoje):
+        sucesso = tentar_ate_dar_certo(cnd_municipal, 3)
+        if sucesso:
+            registrar_log("municipal", 1)
+        else:
+            registrar_log("municipal", 0)
+        sleep(3)
