@@ -74,3 +74,37 @@ def pode_tentar(certidao, data_hoje):
         erro.telegram_bot(f"Erro ao consultar tentativas no banco: {e}", os.getenv("ITOKEN"), int(os.getenv("CHAT_ID")))
         print(f"Erro ao consultar tentativas no banco: {e}")
         return False
+
+def exibir_status_certidao(certidao):
+    try:
+        conexao = pyodbc.connect(
+            rf"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={os.getenv('DB_HOST')};"
+            f"DATABASE={os.getenv('DB_NAME')};"
+            f"UID={os.getenv('DB_USER')};"
+            f"PWD={os.getenv('DB_PASS')};")
+        cursor = conexao.cursor()
+
+        data_hoje = datetime.now().date()
+        cursor.execute("""
+            SELECT tentativas, resultado FROM dbo.cnd_testes
+            WHERE nome_certidao = ? AND CAST(data_execucao AS DATE) = ?""",
+            (certidao, data_hoje))
+        
+        resultado = cursor.fetchone()
+        conexao.close()
+
+        if resultado:
+            tentativas, resultado = resultado
+            status = "Sucesso" if resultado == 1 else "Falhou"
+            msg = f"Certidão: {certidao}\n\nTentativas: {tentativas}\n\nResultado: {status}"
+        else:
+            msg = f"Nenhum registro encontrado para '{certidao}' hoje."
+
+        print(msg)
+        erro.telegram_bot(msg, os.getenv("ITOKEN"), int(os.getenv("CHAT_ID")))
+
+    except Exception as e:
+        erro_msg = f"Erro ao buscar status: {e}"
+        print(erro_msg)
+        erro.telegram_bot(erro_msg, os.getenv("ITOKEN"), int(os.getenv("CHAT_ID")))
